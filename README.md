@@ -1,4 +1,4 @@
 # tsh-mongoose
 Mongoose OS based for Tonchiks Smart Home
 
-Based on Cesanta Software Limited examples
+Primarily based on Cesanta Software Limited examples
