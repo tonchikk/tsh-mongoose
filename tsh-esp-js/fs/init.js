@@ -29,8 +29,8 @@ load('api_net.js');
 load('api_events.js');
 load('api_adc.js');
 load('api_dht.js');
-load('api_esp8266.js');
 load('api_rpc.js');
+load('api_uart.js');
 
 // Set basic variables
 // MQTT_dev will be used as MQTT topics prefixes below
@@ -45,6 +45,11 @@ let lastWiFi_GOT_IP = -1;
 let device = "unknown";
 RPC.call(RPC.LOCAL, 'Sys.GetInfo', null, function(resp, ud) {
   device = resp.arch;
+  if ( device === "esp32" )
+	load('api_esp32.js');
+  if ( device === "esp8266" ) 
+	load('api_esp8266.js');
+
 },null);
 
 // Common
@@ -163,7 +168,6 @@ let ADC_init = function(pin, interval) {
 // GPIO Related
 
 let GPIO_notify = function (pin){
-  let topic = MQTT_dev + '/GPIO';
   MQTT_publish(
     "/GPIO",
     {
@@ -229,8 +233,8 @@ MQTT.sub(MQTT_dev + '/deepSleep', function(conn, topic, msg) {
   if (secToSleep > 0) {
     Timer.set(1000, false, function (){
       print ("Going deep sleep for: ", secToSleep, "on ", device);
-      // if(device === "esp32")
-        // ESP32.deepSleep(secToSleep * 1000 * 1000);
+      if(device === "esp32")
+        ESP32.deepSleep(secToSleep * 1000 * 1000);
       if(device === "esp8266")
         ESP8266.deepSleep(secToSleep * 1000 * 1000);
     }, null);
@@ -262,6 +266,67 @@ Event.addGroupHandler(Net.EVENT_GRP, function(ev, evdata, arg) {
   }
   print('== Net event:', ev, evs);
 }, null);
+
+
+function MHZ19_process_in(data, uartNo) {
+  let a = [];
+  let i = 0;
+  let crc = 0;
+  for (i=0; i < data.length; i++) { a.push(data.at(i)); }
+  crc = 256 - (a[1] + a[2] + a[3] + a[4] + a[5] + a[6] + a[7])%256;
+  let temp = (a[4]-40); 
+  let co = a[2] * 256 + a[3];
+  if (crc === a[8]) {
+  //  print("temp: ", temp,", co2: " , co);
+    MQTT_publish(
+      "/MHZ19",
+      {
+        "port": uartNo,
+        "co2": co,
+      	"temp": temp
+      }
+    );
+  }
+}
+
+function MHZ19_init(uartNo, rxto, txto, interval) {
+  print("Initializing MH-Z19B at UART", uartNo, ", RX of sensor connected to ", rxto, " and TX connected to ", txto, " poll interval ", interval, "msec"  );
+	UART.setConfig(uartNo, {
+		baudRate: 9600,
+		esp32: {
+			gpio: {
+    	  rx: txto,
+      	tx: rxto,
+    	},
+	  },
+  });
+
+  UART.setDispatcher(uartNo, function(uartNo) {
+    let ra = UART.readAvail(uartNo);
+    if (ra > 0) {
+      MHZ19_process_in(UART.read(uartNo),uartNo);
+    }
+  }, null);
+
+  UART.setRxEnabled(uartNo, true); // ready to recieve - go to recieve
+  UART.write(uartNo,"\xFF\x01\x79\x00\x00\x00\x00\x00\x86"); // Disable auto calibration
+
+  Timer.set(interval, Timer.REPEAT, function(uartNo) {
+    // Send request for data
+	  UART.write(uartNo, "\xFF\x01\x86\x00\x00\x00\x00\x00\x79");
+  }, uartNo);
+}
+
+// Serial3.write("\xFF\x01\x87\x00\x00\x00\x00\x00\x78"); ZERO POINT CALIBRATION
+// Serial3.write("\xFF\x01\x79\x00\x00\x00\x00\x00\x86"); ABC logic off
+// Serial3.write("\xFF\x01\x79\xA0\x00\x00\x00\x00\xE6"); ABC logic on
+
+MQTT.sub(MQTT_dev + '/MHZ19/init', function(conn, topic, msg) {
+  print('Topic:', topic, 'message:', msg);
+  let o = JSON.parse(msg);
+  MHZ19_init(o.uartNo,o.rxto,o.txto,o.interval);
+}, null);
+
 
 
 
