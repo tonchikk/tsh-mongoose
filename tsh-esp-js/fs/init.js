@@ -2,7 +2,7 @@
 
    This is TSH Worker tested on ESP8266 based devboards
 
-   Copyright 2017-2018 Anton Kaukin
+   Copyright 2017-2019 Anton Kaukin
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -92,7 +92,9 @@ MQTT.sub(MQTT_dev + '/status/config', function(conn, topic, msg) {
   print('Topic:', topic, 'message:', msg);
   let o = JSON.parse(msg);
   if (lastConfig === "never") {
-    runStatusReporter(5000);
+    runStatusReporter(
+	(o.interval !== null) ? o.interval*1000 : 5000
+    );
   }
   lastConfig = o.date;
 }, null);
