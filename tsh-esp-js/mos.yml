@@ -1,6 +1,7 @@
 author: Tonchik
-description: DHT sensor plus JS for TSH
-version: 0.4
+description: ES32 JS for TSH
+version: 2022.1
+arch: esp32
 
 libs_version: ${mos.version}
 modules_version: ${mos.version}
@@ -32,4 +33,4 @@ tags:
   - dht
   - adc
 
-manifest_version: 2018-09-24
+manifest_version: 2020-08-02
