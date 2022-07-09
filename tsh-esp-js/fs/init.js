@@ -92,7 +92,7 @@ let runStatusReporter = function (i) {
   }, null);
 };
 
-runStatusReporter(1000);
+//runStatusReporter(1000);
 
 // FYI
 MQTT.sub(MQTT_dev + '/status/config', function(conn, topic, msg) {

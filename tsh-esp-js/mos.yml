@@ -7,8 +7,11 @@ libs_version: ${mos.version}
 modules_version: ${mos.version}
 mongoose_os_version: ${mos.version}
 
-sources:
+includes: 
+  - include
+sources: 
   - src
+
 filesystem:
   - fs
 libs:
@@ -26,6 +29,7 @@ libs:
   - origin: https://github.com/mongoose-os-libs/spi
   - origin: https://github.com/mongoose-os-libs/dht
   - origin: https://github.com/mongoose-os-libs/sntp
+  - origin: https://github.com/mongoose-os-libs/onewire
 
 tags:
   - js
