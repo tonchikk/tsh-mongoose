@@ -31,6 +31,7 @@ load('api_adc.js');
 load('api_dht.js');
 load('api_rpc.js');
 load('api_uart.js');
+load('api_ds18x20.js');
 
 // Set basic variables
 // MQTT_dev will be used as MQTT topics prefixes below
@@ -328,78 +329,15 @@ MQTT.sub(MQTT_dev + '/MHZ19/init', function(conn, topic, msg) {
   let o = JSON.parse(msg);
   MHZ19_init(o.uartNo,o.rxto,o.txto,o.interval);
 }, null);
-/*
-let touchInited = false;
-let TPads = {};
 
-let touch_clearReleaseTimer = function(ts){
-  if (TPads[ts].release.timer !== null) {
-    Timer.del(TPads[ts].release.timer);
-    TPads[ts].release.timer = null;
-  }
-};
 
-let touch_release = function(ts) {
-  print('Touchpad',ts,'released');
-  TPads[ts].state = false;
-  touch_clearReleaseTimer(ts);
-};
 
-let touch_press = function(ts) {
-  print('Touchpad',ts,'pressed');
-  TPads[ts].state = true;
-  TPads[ts].release.timer = Timer.set(TPads[ts].release.timeout, 0, touch_release, ts);
-};
+// TSH OneWire DS18x20 / Temperatures
 
-let touch_handler = function(st, cfg) {
-  for (let ts = 0; ts <= 9; ts++) {
-    let f = (1 << ts) & st;
-    if ( (f > 0) && TPads[ts].inited) {
-      let val = TouchPad.readFiltered(ts);
-      print('Touch #', ts, 'Value:', val);
-      if (TPads[ts].state) 
-         touch_clearReleaseTimer(ts);
-      touch_press(ts);      
-    }
-  }
-  TouchPad.clearStatus();
-};
+function ds18x20_callback(devid, temp, userdata) {
+  print('JS DS18x29 got: ', devid, " = ", temp);
+}
 
-let touch_gInit = function() {
-  if (touchInited) return false;
-  print ('Touchpad global init');
-  TouchPad.init();
-  TouchPad.filterStart(10);
-  TouchPad.setMeasTime(0x1000, 0xffff);
-  TouchPad.setVoltage(TouchPad.HVOLT_2V4, TouchPad.LVOLT_0V8, TouchPad.HVOLT_ATTEN_1V5);
-  TouchPad.isrRegister(touch_handler,null);
-  TouchPad.intrEnable();
-  return (touchInited = true);
-};
-
-let touch_configPin = function (ts) {
-  TPads[ts].noTouchVal = TouchPad.readFiltered(ts);
-  TPads[ts].touchThresh = TPads[ts].noTouchVal *  TPads[ts].sens;
-  TouchPad.setThresh(ts, TPads[ts].touchThresh);
-  print('Touch Sensor', ts, 'noTouchVal', TPads[ts].noTouchVal, 'touchThresh', TPads[ts].touchThresh);
-  TPads[ts].inited = true;      
-};
-
-let touch_startPin = function(ts) {
-  touch_gInit();
-  print('Touch Sensor', ts,'init');
-  TouchPad.config(ts, 0);
-  TPads[ts] = {
-    'sens': 0.8,
-    'release' : { 'timeout': 200, "t": null},
-    'state': false,
-    'inited': false,
-  };
-  Timer.set(1000, 0, touch_configPin, ts); 
-};
-
-//touch_startPin(0);
-*/
-
+ds18x20.set_callback(ds18x20_callback, null);
 
 
