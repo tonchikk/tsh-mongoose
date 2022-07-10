@@ -20,7 +20,7 @@ enum mgos_app_init_result mgos_app_init(void) {
     printf("TSH: [mgos_app_init] start\n");
 
     printf("TSH: [mgos_app_init] sheduling 7s run_1w_temp\n");
-    mgos_set_timer(7000, MGOS_TIMER_REPEAT, run_1w_temp, NULL);
+    //mgos_set_timer(7000, MGOS_TIMER_REPEAT, run_1w_temp, NULL);
     
     // Init OK
     printf("TSH: [mgos_app_init] done with MGOS_APP_INIT_SUCCESS\n");
