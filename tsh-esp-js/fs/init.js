@@ -338,10 +338,13 @@ function ds18x20_callback(devid, temp, userdata) {
   print('JS DS18x29 got: ', devid, " = ", temp);
 }
 
+ds18x20.set_mqtt_base(MQTT_dev + "/ow/temp");
+
 Timer.set(6*1000, true, function() {
   print('JS DS18x29 executing read_all');
   ds18x20.read_all(4);
 }, null);
+
 
 // ds18x20.set_callback(ds18x20_callback, null);
 
