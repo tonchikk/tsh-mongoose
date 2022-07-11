@@ -20,11 +20,17 @@ typedef struct ds18x20_result {
 
 typedef void (*ds18x20_callback_t)(char *mac,float temp,void *userdata);
 
-void ds18x20_read_all(int pin);
+// TSH
 bool ds18x20_set_callback(ds18x20_callback_t cb, void *userdata);
 bool ds18x20_set_mqtt_base (char *base);
 bool ds18x20_mqtt_publish (ds18x20_result_t *rom);
 
+struct ds18x20_result *ds18x20_find_all(int pin);
+int ds18x20_request_all(struct ds18x20_result *list);
+void ds18x20_read_all(struct ds18x20_result *list);
+void ds18x20_publish_all(struct ds18x20_result *list);
+void ds18x20_finish_list(struct ds18x20_result *list);
+void ds18x20_process_all(struct ds18x20_result *list);
 
 #ifdef __cplusplus
 }
