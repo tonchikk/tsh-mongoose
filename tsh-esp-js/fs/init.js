@@ -43,37 +43,37 @@ let tshDebug = 0;
 
 // MQTT_dev will be used as MQTT topics prefixes below
 let MQTT_dev = '/devices/' + Cfg.get('device.id');
+/**
+ * Common publisher for MQTT
+ * @param {*} component - second part of MQTT path to publish
+ * @param {*} data - message to publish
+ */
+ let MQTT_publish = function (component, data) {
+  let msg = JSON.stringify (data);
+  let topic = MQTT_dev + component;
+  let ok = MQTT.pub(topic, msg, 1);
+  if (tshDebug !== 0 || ok === 0) 
+      print('Published:', ok ? 'yes' : 'no', 'topic:', topic, 'message:', msg); 
+};
+
 
 // lastConfig and lastWiFi_GOT_IP usefull for configuration engine
 // It is designed to "update configuration" on every reconnect to WiFi
 // This reconfiguration extreemly usefull on poor WiFi
 let lastConfig = "never";
 let lastWiFi_GOT_IP = -1;
-
 // FYI
 let device = "unknown";
+let tsh_version = "none";
 RPC.call(RPC.LOCAL, 'Sys.GetInfo', null, function(resp, ud) {
   device = resp.arch;
+  tsh_version = resp.fw_version; 
  /* if ( device === "esp32" )
   {
  }
   if ( device === "esp8266" ) 
 */
 },null);
-
-
-/**
- * Common publisher for MQTT
- * @param {*} component - second part of MQTT path to publish
- * @param {*} data - message to publish
- */
-let MQTT_publish = function (component, data) {
-    let msg = JSON.stringify (data);
-    let topic = MQTT_dev + component;
-    let ok = MQTT.pub(topic, msg, 1);
-    if (tshDebug !== 0 || ok === 0) 
-        print('Published:', ok ? 'yes' : 'no', 'topic:', topic, 'message:', msg); 
-};
 
 /**
  * 
@@ -87,7 +87,8 @@ let GetStats = function () {
     uptime: Sys.uptime(),
     configured: lastConfig,
     net_uptime: Sys.uptime() - lastWiFi_GOT_IP,
-    device_arch: device 
+    device_arch: device,
+    tsh_version: tsh_version
   };
 };
 
@@ -166,7 +167,7 @@ let dhts = {} ;
  * Initilalizing poller of DHT sensor
  * @param {*} pin - GPIO pin number with connected DHT sensor
  * @param {*} interval - interval in msec to poll
- * @returns 
+ * @returns nothing
  */
 let DHT_init = function(pin, interval) {
   print("Initializing DHT2302 @ ", pin);
@@ -390,8 +391,3 @@ function ds18x20_callback(devid, temp, userdata) {
 }
 ds18x20.set_callback(ds18x20_callback, null);
 */
-
-
-
-
-
