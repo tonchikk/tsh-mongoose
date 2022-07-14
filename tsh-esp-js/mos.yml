@@ -1,13 +1,17 @@
 author: Tonchik
-description: DHT sensor plus JS for TSH
-version: 0.4
+description: ES32 JS for TSH
+version: 2022.1.1
+arch: esp32
 
 libs_version: ${mos.version}
 modules_version: ${mos.version}
 mongoose_os_version: ${mos.version}
 
-sources:
+includes: 
+  - include
+sources: 
   - src
+
 filesystem:
   - fs
 libs:
@@ -25,11 +29,17 @@ libs:
   - origin: https://github.com/mongoose-os-libs/spi
   - origin: https://github.com/mongoose-os-libs/dht
   - origin: https://github.com/mongoose-os-libs/sntp
+  - origin: https://github.com/mongoose-os-libs/onewire
 
 tags:
   - js
   - hw
   - dht
   - adc
+  - ds18b20
+  - ow
+  - ds18s20
+  - gpio
+  - mqtt
 
-manifest_version: 2018-09-24
+manifest_version: 2020-08-02

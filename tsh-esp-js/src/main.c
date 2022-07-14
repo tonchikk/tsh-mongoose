@@ -9,7 +9,12 @@
 #include "mgos_hal.h"
 #include "mgos_dlsym.h"
 #include "mjs.h"
+#include "ds18x20.h"
+
 
 enum mgos_app_init_result mgos_app_init(void) {
-  return MGOS_APP_INIT_SUCCESS;
+    // Init OK
+    printf("TSH: [mgos_app_init] done with MGOS_APP_INIT_SUCCESS\n");
+    return MGOS_APP_INIT_SUCCESS;
 }
+

@@ -32,25 +32,42 @@ load('api_dht.js');
 load('api_rpc.js');
 load('api_uart.js');
 
+// the platform is ESP 32, only
+load('api_esp32.js');
+
+// TSH Libraries
+load('api_ds18x20.js');
+
 // Set basic variables
+let tshDebug = 0;
+
 // MQTT_dev will be used as MQTT topics prefixes below
 let MQTT_dev = '/devices/' + Cfg.get('device.id');
+/**
+ * Common publisher for MQTT
+ * @param {*} component - second part of MQTT path to publish
+ * @param {*} data - message to publish
+ */
+ let MQTT_publish = function (component, data) {
+  let msg = JSON.stringify (data);
+  let topic = MQTT_dev + component;
+  let ok = MQTT.pub(topic, msg, 1);
+  if (tshDebug !== 0 || ok === 0) 
+      print('Published:', ok ? 'yes' : 'no', 'topic:', topic, 'message:', msg); 
+};
+
+
 // lastConfig and lastWiFi_GOT_IP usefull for configuration engine
 // It is designed to "update configuration" on every reconnect to WiFi
 // This reconfiguration extreemly usefull on poor WiFi
 let lastConfig = "never";
 let lastWiFi_GOT_IP = -1;
-
-let tshDebug = 0;
-    load('api_esp32.js');
-    load('api_esp32_touchpad.js');
- 
-//    load('api_esp8266.js');
-
 // FYI
 let device = "unknown";
+let tsh_version = "none";
 RPC.call(RPC.LOCAL, 'Sys.GetInfo', null, function(resp, ud) {
   device = resp.arch;
+  tsh_version = resp.fw_version; 
  /* if ( device === "esp32" )
   {
  }
@@ -58,14 +75,10 @@ RPC.call(RPC.LOCAL, 'Sys.GetInfo', null, function(resp, ud) {
 */
 },null);
 
-// Common
-let MQTT_publish = function (component, data) {
-    let msg = JSON.stringify (data);
-    let topic = MQTT_dev + component;
-    let ok = MQTT.pub(topic, msg, 1);
-    if (tshDebug !== 0 || ok === 0) 
-        print('Published:', ok ? 'yes' : 'no', 'topic:', topic, 'message:', msg); 
-};
+/**
+ * 
+ * @returns Hash with uptime/runtime staistics
+ */
 
 let GetStats = function () {
   return {
@@ -74,11 +87,12 @@ let GetStats = function () {
     uptime: Sys.uptime(),
     configured: lastConfig,
     net_uptime: Sys.uptime() - lastWiFi_GOT_IP,
-    device_arch: device 
+    device_arch: device,
+    tsh_version: tsh_version
   };
 };
 
-// Publish basic info
+// Publish basic info to keep alive with master
 let tmStatus = null;
 let runStatusReporter = function (i) {
   if (tmStatus !== null) {
@@ -94,7 +108,7 @@ let runStatusReporter = function (i) {
 
 runStatusReporter(1000);
 
-// FYI
+// Set last time of config to confirm stable connection with master
 MQTT.sub(MQTT_dev + '/status/config', function(conn, topic, msg) {
   print('Topic:', topic, 'message:', msg);
   let o = JSON.parse(msg);
@@ -105,10 +119,56 @@ MQTT.sub(MQTT_dev + '/status/config', function(conn, topic, msg) {
 }, null);
 
 
+// Handle deep sleep
+let otaMode = false;
+let secToSleep = 0;
+MQTT.sub(MQTT_dev + '/deepSleep', function(conn, topic, msg) {
+  print('Topic:', topic, 'message:', msg);
+  let o = JSON.parse(msg);
+  secToSleep = o.timeout;
+  if (secToSleep > 0) {
+    Timer.set(1000, false, function (){
+      print ("Going deep sleep for: ", secToSleep, "on ", device);
+      if(device === "esp32")
+        ESP32.deepSleep(secToSleep * 1000 * 1000);
+      if(device === "esp8266")
+        ESP8266.deepSleep(secToSleep * 1000 * 1000);
+    }, null);
+  };
+}, null);
+
+
+// Monitor network connectivity.
+Event.addGroupHandler(Net.EVENT_GRP, function(ev, evdata, arg) {
+  let evs = '???';
+  if (ev === Net.STATUS_DISCONNECTED) {
+    evs = 'DISCONNECTED';
+    lastConfig = "never";
+    runStatusReporter(1000);
+  } else if (ev === Net.STATUS_CONNECTING) {
+    evs = 'CONNECTING';
+  } else if (ev === Net.STATUS_CONNECTED) {
+    evs = 'CONNECTED';
+  } else if (ev === Net.STATUS_GOT_IP) {
+    evs = 'GOT_IP';
+    lastWiFi_GOT_IP = Sys.uptime();
+  }
+  print('== Net event:', ev, evs);
+}, null);
+
+
+/*******************
+ * Here comes sensors' and custom devices part
+ */
+
 // DHT global
-
 let dhts = {} ;
-
+/**
+ * Initilalizing poller of DHT sensor
+ * @param {*} pin - GPIO pin number with connected DHT sensor
+ * @param {*} interval - interval in msec to poll
+ * @returns nothing
+ */
 let DHT_init = function(pin, interval) {
   print("Initializing DHT2302 @ ", pin);
   
@@ -118,7 +178,6 @@ let DHT_init = function(pin, interval) {
   }
   
   dhts[pin] = DHT.create(pin, DHT.AM2302);
-  dhts[pin].begin();
 
   Timer.set(interval, true , function(p) {
 
@@ -145,6 +204,12 @@ let DHT_init = function(pin, interval) {
   print("Initializing DHT2302 @ ", pin, " - done");
 };
 
+MQTT.sub(MQTT_dev + '/dht/init', function(conn, topic, msg) {
+  print('Topic:', topic, 'message:', msg);
+  let o = JSON.parse(msg);
+  DHT_init(o.pin,o.interval);
+}, null);
+
 
 // ADC Part
 
@@ -167,6 +232,12 @@ let ADC_init = function(pin, interval) {
   print("Initializing ADC @ ", pin, " - done");
 };
 
+MQTT.sub(MQTT_dev + '/ADC/init', function(conn, topic, msg) {
+  print('Topic:', topic, 'message:', msg);
+  let o = JSON.parse(msg);
+  ADC_init(o.pin,o.interval);
+}, null);
+
 // GPIO Related
 
 let GPIO_notify = function (pin){
@@ -185,20 +256,13 @@ let GPIO_runInput = function (pin) {
   GPIO.set_int_handler(pin, GPIO.INT_EDGE_ANY, GPIO_notify, null);
   GPIO.enable_int(pin);
   print("Configured for input handling: ", pin);
+  GPIO_notify(pin); // Run once to update (maybe missed) state
 };
 
 let GPIO_setOutput = function (pin, state) {
   GPIO.set_mode(pin, GPIO.MODE_OUTPUT);
   GPIO.write(pin, state);
 };
-
-// GPIO pin description
-let pinLED = 2;
-let pinMove = 4;
-let pinPWM = 2;
-// LED
-
-GPIO_setOutput(pinLED,1); //off
 
 // Basic subscriptions
 MQTT.sub(MQTT_dev + '/GPIO/setPWM', function(conn, topic, msg) {
@@ -220,55 +284,10 @@ MQTT.sub(MQTT_dev + '/GPIO/setOutput', function(conn, topic, msg) {
   GPIO_setOutput(o.pin, o.state);
 }, null);
 
-MQTT.sub(MQTT_dev + '/dht/init', function(conn, topic, msg) {
-  print('Topic:', topic, 'message:', msg);
-  let o = JSON.parse(msg);
-  DHT_init(o.pin,o.interval);
-}, null);
 
-let otaMode = false;
-let secToSleep = 0;
-MQTT.sub(MQTT_dev + '/deepSleep', function(conn, topic, msg) {
-  print('Topic:', topic, 'message:', msg);
-  let o = JSON.parse(msg);
-  secToSleep = o.timeout;
-  if (secToSleep > 0) {
-    Timer.set(1000, false, function (){
-      print ("Going deep sleep for: ", secToSleep, "on ", device);
-      if(device === "esp32")
-        ESP32.deepSleep(secToSleep * 1000 * 1000);
-      if(device === "esp8266")
-        ESP8266.deepSleep(secToSleep * 1000 * 1000);
-    }, null);
-  };
-}, null);
+// MH Z19 support
 
-
-MQTT.sub(MQTT_dev + '/ADC/init', function(conn, topic, msg) {
-  print('Topic:', topic, 'message:', msg);
-  let o = JSON.parse(msg);
-  ADC_init(o.pin,o.interval);
-}, null);
-
-
-// Monitor network connectivity.
-Event.addGroupHandler(Net.EVENT_GRP, function(ev, evdata, arg) {
-  let evs = '???';
-  if (ev === Net.STATUS_DISCONNECTED) {
-    evs = 'DISCONNECTED';
-    lastConfig = "never";
-    runStatusReporter(1000);
-  } else if (ev === Net.STATUS_CONNECTING) {
-    evs = 'CONNECTING';
-  } else if (ev === Net.STATUS_CONNECTED) {
-    evs = 'CONNECTED';
-  } else if (ev === Net.STATUS_GOT_IP) {
-    evs = 'GOT_IP';
-    lastWiFi_GOT_IP = Sys.uptime();
-  }
-  print('== Net event:', ev, evs);
-}, null);
-
+let mhz19s = {} ;
 
 function MHZ19_process_in(data, uartNo) {
   let a = [];
@@ -293,6 +312,12 @@ function MHZ19_process_in(data, uartNo) {
 
 function MHZ19_init(uartNo, rxto, txto, interval) {
   print("Initializing MH-Z19B at UART", uartNo, ", RX of sensor connected to ", rxto, " and TX connected to ", txto, " poll interval ", interval, "msec"  );
+  if (mhz19s[rxto + "/" + txto] !== undefined) {
+    print("already done @",rxto + "/" + txto,"reboot to reset");
+    return;
+  };
+  mhz19s[rxto + "/" + txto] = true;
+
 	UART.setConfig(uartNo, {
 		baudRate: 9600,
 		esp32: {
@@ -328,78 +353,40 @@ MQTT.sub(MQTT_dev + '/MHZ19/init', function(conn, topic, msg) {
   let o = JSON.parse(msg);
   MHZ19_init(o.uartNo,o.rxto,o.txto,o.interval);
 }, null);
-/*
-let touchInited = false;
-let TPads = {};
 
-let touch_clearReleaseTimer = function(ts){
-  if (TPads[ts].release.timer !== null) {
-    Timer.del(TPads[ts].release.timer);
-    TPads[ts].release.timer = null;
-  }
-};
 
-let touch_release = function(ts) {
-  print('Touchpad',ts,'released');
-  TPads[ts].state = false;
-  touch_clearReleaseTimer(ts);
-};
 
-let touch_press = function(ts) {
-  print('Touchpad',ts,'pressed');
-  TPads[ts].state = true;
-  TPads[ts].release.timer = Timer.set(TPads[ts].release.timeout, 0, touch_release, ts);
-};
+// TSH OneWire DS18x20 / Temperatures
 
-let touch_handler = function(st, cfg) {
-  for (let ts = 0; ts <= 9; ts++) {
-    let f = (1 << ts) & st;
-    if ( (f > 0) && TPads[ts].inited) {
-      let val = TouchPad.readFiltered(ts);
-      print('Touch #', ts, 'Value:', val);
-      if (TPads[ts].state) 
-         touch_clearReleaseTimer(ts);
-      touch_press(ts);      
-    }
-  }
-  TouchPad.clearStatus();
-};
 
-let touch_gInit = function() {
-  if (touchInited) return false;
-  print ('Touchpad global init');
-  TouchPad.init();
-  TouchPad.filterStart(10);
-  TouchPad.setMeasTime(0x1000, 0xffff);
-  TouchPad.setVoltage(TouchPad.HVOLT_2V4, TouchPad.LVOLT_0V8, TouchPad.HVOLT_ATTEN_1V5);
-  TouchPad.isrRegister(touch_handler,null);
-  TouchPad.intrEnable();
-  return (touchInited = true);
-};
+ds18x20.set_mqtt_base(MQTT_dev + "/ow/temp");
 
-let touch_configPin = function (ts) {
-  TPads[ts].noTouchVal = TouchPad.readFiltered(ts);
-  TPads[ts].touchThresh = TPads[ts].noTouchVal *  TPads[ts].sens;
-  TouchPad.setThresh(ts, TPads[ts].touchThresh);
-  print('Touch Sensor', ts, 'noTouchVal', TPads[ts].noTouchVal, 'touchThresh', TPads[ts].touchThresh);
-  TPads[ts].inited = true;      
-};
+let ds18x20s = {};
 
-let touch_startPin = function(ts) {
-  touch_gInit();
-  print('Touch Sensor', ts,'init');
-  TouchPad.config(ts, 0);
-  TPads[ts] = {
-    'sens': 0.8,
-    'release' : { 'timeout': 200, "t": null},
-    'state': false,
-    'inited': false,
+let ds18x20_init = function(pin,interval) {
+  print("Initializing ds18x20 at pin", pin, " poll interval ", interval, "sec"  );
+  if (ds18x20s[pin] !== undefined ) {
+    print("ds18x20 reinit @ GPIO ", pin);
+    Timer.del(ds18x20s[pin]);
   };
-  Timer.set(1000, 0, touch_configPin, ts); 
+
+  ds18x20s[pin] = Timer.set(interval * 1000, true, function(p) {
+    print('TSH JS: DS18x29 executing ds18x20.run_line_once @ GPIO ', p.pin);
+    ds18x20.run_line_once(p.pin);
+  }, {pin: pin});
 };
 
-//touch_startPin(0);
+MQTT.sub(MQTT_dev + '/ds18x20/init', function(conn, topic, msg) {
+  print('Topic:', topic, 'message:', msg);
+  let o = JSON.parse(msg);
+  ds18x20_init(o.pin,o.interval);
+}, null);
+
+// ds18x20_init(4,6);
+
+/* Not working, to do :-)
+function ds18x20_callback(devid, temp, userdata) {
+  print('JS DS18x29 got: ', devid, " = ", temp);
+}
+ds18x20.set_callback(ds18x20_callback, null);
 */
-
-
-
