@@ -28,3 +28,6 @@ No check fro CRC - but trust me it is requred on 1m+.
 ## How to install this app
 Use  [mos tool](https://mongoose-os.com/software.html) to build and flash.
 
+## bit of stats
+ESP32 + initialized one line of 1w with one DS18b20: "free_ram":124792,"total_ram":252452
+
