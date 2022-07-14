@@ -1,6 +1,6 @@
 author: Tonchik
 description: ES32 JS for TSH
-version: 2022.1
+version: 2022.1.1
 arch: esp32
 
 libs_version: ${mos.version}
@@ -36,5 +36,10 @@ tags:
   - hw
   - dht
   - adc
+  - ds18b20
+  - ow
+  - ds18s20
+  - gpio
+  - mqtt
 
 manifest_version: 2020-08-02
