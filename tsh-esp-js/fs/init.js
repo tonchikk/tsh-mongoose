@@ -178,7 +178,6 @@ let DHT_init = function(pin, interval) {
   }
   
   dhts[pin] = DHT.create(pin, DHT.AM2302);
-  dhts[pin].begin();
 
   Timer.set(interval, true , function(p) {
 
