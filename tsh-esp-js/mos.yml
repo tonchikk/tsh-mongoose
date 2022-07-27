@@ -1,7 +1,7 @@
 author: Tonchik
 description: ES32 JS for TSH
-version: 2022.1.1
-arch: esp32
+version: 2022.1.2
+#arch: esp32
 
 libs_version: ${mos.version}
 modules_version: ${mos.version}
@@ -11,25 +11,38 @@ includes:
   - include
 sources: 
   - src
-
 filesystem:
   - fs
+
 libs:
-  # common mgos libs
+  # Core
   - origin: https://github.com/mongoose-os-libs/boards
   - origin: https://github.com/mongoose-os-libs/core
   - origin: https://github.com/mongoose-os-libs/http-server
   - origin: https://github.com/mongoose-os-libs/ca-bundle
   - origin: https://github.com/mongoose-os-libs/mjs
+  - origin: https://github.com/mongoose-os-libs/sntp
+  - origin: https://github.com/mongoose-os-libs/wifi
+  # RPC Channels
+  - origin: https://github.com/mongoose-os-libs/rpc-uart
+  - origin: https://github.com/mongoose-os-libs/rpc-ws
+  - origin: https://github.com/mongoose-os-libs/rpc-loopback
+  - origin: https://github.com/mongoose-os-libs/rpc-mqtt
+  # RPC Services
+  - origin: https://github.com/mongoose-os-libs/rpc-service-ota
+  - origin: https://github.com/mongoose-os-libs/rpc-service-wifi
   - origin: https://github.com/mongoose-os-libs/rpc-service-config
   - origin: https://github.com/mongoose-os-libs/rpc-service-fs
-  - origin: https://github.com/mongoose-os-libs/rpc-uart
   - origin: https://github.com/mongoose-os-libs/rpc-service-gpio
-  - origin: https://github.com/mongoose-os-libs/rpc-ws
-  - origin: https://github.com/mongoose-os-libs/spi
+  # OTA
+  - origin: https://github.com/mongoose-os-libs/ota-http-client
+  - origin: https://github.com/mongoose-os-libs/ota-http-server
+  # Libraries
   - origin: https://github.com/mongoose-os-libs/dht
-  - origin: https://github.com/mongoose-os-libs/sntp
   - origin: https://github.com/mongoose-os-libs/onewire
+  - origin: https://github.com/mongoose-os-libs/adc
+  - origin: https://github.com/mongoose-os-libs/pwm
+
 
 tags:
   - js
@@ -41,5 +54,7 @@ tags:
   - ds18s20
   - gpio
   - mqtt
+  - pwm
+  - MH-Z19
 
 manifest_version: 2020-08-02

@@ -1,8 +1,8 @@
 /*
 
-   This is TSH Worker tested on ESP8266 based devboards
+   This is TSH Worker tested on ESP32 based devboards
 
-   Copyright 2017-2019 Anton Kaukin
+   Copyright 2017-2022 Anton Kaukin
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -32,14 +32,10 @@ load('api_dht.js');
 load('api_rpc.js');
 load('api_uart.js');
 
-// the platform is ESP 32, only
-load('api_esp32.js');
-
+// TSH
+load('tsh_core.js');
 // TSH Libraries
 load('api_ds18x20.js');
-
-// Set basic variables
-let tshDebug = 0;
 
 // MQTT_dev will be used as MQTT topics prefixes below
 let MQTT_dev = '/devices/' + Cfg.get('device.id');
@@ -52,27 +48,14 @@ let MQTT_dev = '/devices/' + Cfg.get('device.id');
   let msg = JSON.stringify (data);
   let topic = MQTT_dev + component;
   let ok = MQTT.pub(topic, msg, 1);
-  if (tshDebug !== 0 || ok === 0) 
+  if (TSH.Debug !== 0 || ok === 0) 
       print('Published:', ok ? 'yes' : 'no', 'topic:', topic, 'message:', msg); 
 };
 
 
-// lastConfig and lastWiFi_GOT_IP usefull for configuration engine
-// It is designed to "update configuration" on every reconnect to WiFi
-// This reconfiguration extreemly usefull on poor WiFi
-let lastConfig = "never";
-let lastWiFi_GOT_IP = -1;
-// FYI
-let device = "unknown";
-let tsh_version = "none";
 RPC.call(RPC.LOCAL, 'Sys.GetInfo', null, function(resp, ud) {
-  device = resp.arch;
-  tsh_version = resp.fw_version; 
- /* if ( device === "esp32" )
-  {
- }
-  if ( device === "esp8266" ) 
-*/
+  TSH.device = resp.arch;
+  TSH.version = resp.fw_version; 
 },null);
 
 /**
@@ -85,10 +68,10 @@ let GetStats = function () {
     total_ram: Sys.total_ram(),
     free_ram: Sys.free_ram(),
     uptime: Sys.uptime(),
-    configured: lastConfig,
-    net_uptime: Sys.uptime() - lastWiFi_GOT_IP,
-    device_arch: device,
-    tsh_version: tsh_version
+    configured: TSH.lastConfig,
+    net_uptime: Sys.uptime() - TSH.lastWiFi_GOT_IP,
+    device_arch: TSH.device,
+    tsh_version: TSH.version
   };
 };
 
@@ -115,7 +98,7 @@ MQTT.sub(MQTT_dev + '/status/config', function(conn, topic, msg) {
   if (o.interval === undefined)
     o.interval = 5;
   runStatusReporter(o.interval * 1000);
-  lastConfig = o.date;
+  TSH.lastConfig = o.date;
 }, null);
 
 
@@ -129,9 +112,9 @@ MQTT.sub(MQTT_dev + '/deepSleep', function(conn, topic, msg) {
   if (secToSleep > 0) {
     Timer.set(1000, false, function (){
       print ("Going deep sleep for: ", secToSleep, "on ", device);
-      if(device === "esp32")
+      if(TSH.device === "esp32")
         ESP32.deepSleep(secToSleep * 1000 * 1000);
-      if(device === "esp8266")
+      if(TSH.device === "esp8266")
         ESP8266.deepSleep(secToSleep * 1000 * 1000);
     }, null);
   };
@@ -143,7 +126,7 @@ Event.addGroupHandler(Net.EVENT_GRP, function(ev, evdata, arg) {
   let evs = '???';
   if (ev === Net.STATUS_DISCONNECTED) {
     evs = 'DISCONNECTED';
-    lastConfig = "never";
+    TSH.lastConfig = "never";
     runStatusReporter(1000);
   } else if (ev === Net.STATUS_CONNECTING) {
     evs = 'CONNECTING';
@@ -151,7 +134,7 @@ Event.addGroupHandler(Net.EVENT_GRP, function(ev, evdata, arg) {
     evs = 'CONNECTED';
   } else if (ev === Net.STATUS_GOT_IP) {
     evs = 'GOT_IP';
-    lastWiFi_GOT_IP = Sys.uptime();
+    TSH.lastWiFi_GOT_IP = Sys.uptime();
   }
   print('== Net event:', ev, evs);
 }, null);
@@ -311,12 +294,12 @@ function MHZ19_process_in(data, uartNo) {
 }
 
 function MHZ19_init(uartNo, rxto, txto, interval) {
-  print("Initializing MH-Z19B at UART", uartNo, ", RX of sensor connected to ", rxto, " and TX connected to ", txto, " poll interval ", interval, "msec"  );
-  if (mhz19s[rxto + "/" + txto] !== undefined) {
-    print("already done @",rxto + "/" + txto,"reboot to reset");
+  let mhid = JSON.stringify(rxto) + "/" + JSON.stringify(txto);
+  print("Initializing MH-Z19B [", mhid , "] at UART", uartNo, ", RX of sensor connected to ", rxto, " and TX connected to ", txto, " poll interval ", interval, "msec"  );
+  if (mhz19s[mhid] !== undefined) {
+    print("already done @",mhid,"reboot to reset");
     return;
   };
-  mhz19s[rxto + "/" + txto] = true;
 
 	UART.setConfig(uartNo, {
 		baudRate: 9600,
@@ -336,9 +319,10 @@ function MHZ19_init(uartNo, rxto, txto, interval) {
   }, null);
 
   UART.setRxEnabled(uartNo, true); // ready to recieve - go to recieve
-  UART.write(uartNo,"\xFF\x01\x79\x00\x00\x00\x00\x00\x86"); // Disable auto calibration
+  UART.write(uartNo,"\xFF\x01\x79\x00\x00\x00\x00\x00\x86"); // Disable auto calibration = ABC off 
+  // ABC is "lowest seen in a day is 400"
 
-  Timer.set(interval, Timer.REPEAT, function(uartNo) {
+  mhz19s[mhid] = Timer.set(interval, Timer.REPEAT, function(uartNo) {
     // Send request for data
 	  UART.write(uartNo, "\xFF\x01\x86\x00\x00\x00\x00\x00\x79");
   }, uartNo);
