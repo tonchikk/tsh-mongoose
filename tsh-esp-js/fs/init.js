@@ -245,6 +245,7 @@ let GPIO_runInput = function (pin) {
   GPIO.set_int_handler(pin, GPIO.INT_EDGE_ANY, GPIO_notify, null);
   GPIO.enable_int(pin);
   print("Configured for input handling: ", pin);
+  GPIOi[pin] = -1;
   GPIO_notify(pin); // Run once to update (maybe missed) state
 };
 
