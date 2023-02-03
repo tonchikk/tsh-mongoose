@@ -223,14 +223,20 @@ MQTT.sub(MQTT_dev + '/ADC/init', function(conn, topic, msg) {
 
 // GPIO Related
 
+let GPIOi = {};
+
 let GPIO_notify = function (pin){
-  MQTT_publish(
-    "/GPIO",
-    {
-      "pin": pin,
-      "value": GPIO.read(pin)
-    }
-  );
+  let v = GPIO.read(pin);
+  if ( GPIOi[pin] !== v ) {
+    MQTT_publish(
+      "/GPIO",
+      {
+        "pin": pin,
+        "value": v
+      }
+    );
+    GPIOi[pin] = v;
+  };
 };
 
 let GPIO_runInput = function (pin) {
