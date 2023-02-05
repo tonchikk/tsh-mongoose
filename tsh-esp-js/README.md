@@ -4,8 +4,8 @@
 This tool targeted to recieve commands from controlling TSH daemon via MQTT and publish requested updates back.
 
 ## Hardware
-- Supported ESP32 (yellow pin, black pin, external antenna)
-- ESP8266 support is dropped
+- Supported ESP32 (yellow pin, black pin, external antenna) - comment versions in mos.yml to use latest Mongoose OS
+- ESP8266 support is barely tested: just booted up and connected to MQTT. And it is hardcoded now to use Mongoose-OS version 2.19.1 due bug https://github.com/cesanta/mongoose-os/issues/593 
 
 ## Regular functionality
 - GPIO in/out, pwm
@@ -23,11 +23,12 @@ Code to be updated with [MH-Z19 @ REvSpace.nl](https://revspace.nl/MHZ19)
 
 ### DS18B20 & DS18S20
 In heavy testing, theoretically support for multiply lines, only MQTT publishing from C code, no value returns to JS for today.
-No check fro CRC - but trust me it is requred on 1m+.
+No check for CRC - but trust me it is requred on 1m+ lengths.
 
 ## How to install this app
 Use  [mos tool](https://mongoose-os.com/software.html) to build and flash.
 
 ## bit of stats
-ESP32 + initialized one line of 1w with one DS18b20: "free_ram":124792,"total_ram":252452
+- ESP32 + initialized one line of 1w with one DS18b20: "free_ram":124792,"total_ram":252452
+- ESP8266EX - "free_ram":28304,"total_ram":52424
 

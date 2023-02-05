@@ -1,11 +1,10 @@
 author: Tonchik
-description: ES32 JS for TSH
-version: 2022.1.2
-#arch: esp32
+description: ESP JS for TSH
+version: 2023.0.2
 
-libs_version: ${mos.version}
-modules_version: ${mos.version}
-mongoose_os_version: ${mos.version}
+libs_version: 2.19.1 #${mos.version}
+modules_version: 2.19.1 #${mos.version}
+mongoose_os_version: 2.19.1 #${mos.version}
 
 includes: 
   - include
