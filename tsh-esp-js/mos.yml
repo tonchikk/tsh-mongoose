@@ -1,10 +1,10 @@
 author: Tonchik
 description: ESP JS for TSH
-version: 2023.0.2
+version: 2023.1.0-dev-pcnt
 
-libs_version: 2.19.1 #${mos.version}
-modules_version: 2.19.1 #${mos.version}
-mongoose_os_version: 2.19.1 #${mos.version}
+#libs_version: 2.19.1 #${mos.version}
+#modules_version: 2.19.1 #${mos.version}
+#mongoose_os_version: 2.19.1 #${mos.version}
 
 includes: 
   - include
