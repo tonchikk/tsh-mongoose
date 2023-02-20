@@ -10,6 +10,7 @@
 #include "mgos_dlsym.h"
 #include "mjs.h"
 #include "ds18x20.h"
+#include "esp32hwpcnt.h"
 
 
 enum mgos_app_init_result mgos_app_init(void) {

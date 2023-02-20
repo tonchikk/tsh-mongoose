@@ -8,10 +8,13 @@ version: 2023.1.0-dev-pcnt
 
 includes: 
   - include
+
 sources: 
   - src
+
 filesystem:
   - fs
+
 
 libs:
   # Core
