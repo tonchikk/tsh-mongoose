@@ -6,7 +6,7 @@ extern "C" {
 
 typedef struct esp32hwpcnt {
     // int unit;
-    long count, hlims;
+    int count, hlims;
     int16_t hlim;
     int gpio;
     //struct esp32hwpcnt *next;
@@ -23,8 +23,8 @@ typedef struct pcnt_evt {
 
 int esp32hwpcnt_get_max_units(void);
 bool esp32hwpcnt_init_unit(int unit, int gpio, int filter, int lim );
-long esp32hwpcnt_get_pulses(int unit);
-long esp32hwpcnt_get_majors(int unit);
+int esp32hwpcnt_get_pulses(int unit);
+int esp32hwpcnt_get_majors(int unit);
 bool esp32hwpcnt_start(void);
 void esp32hwpcnt_main_task(void * pvParameters);
 

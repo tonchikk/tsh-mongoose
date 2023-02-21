@@ -1,3 +1,9 @@
+
+/*
+lim to be between [−32768, +32767] - short
+count to be between [−2 147 483 648, +2 147 483 647] - int
+*/
+
 let esp32hwpcnt = {
     GPIO: {},
     Units: {},
@@ -27,8 +33,8 @@ let esp32hwpcnt = {
         }
         return this.started;
     },
-    get_unit_pulses: ffi('long esp32hwpcnt_get_pulses(int)'),
-    get_unit_majors: ffi('long esp32hwpcnt_get_majors(int)'),
+    get_unit_pulses: ffi('int esp32hwpcnt_get_pulses(int)'),
+    get_unit_majors: ffi('int esp32hwpcnt_get_majors(int)'),
     get: function(gpio) {
         return this.Units[this.GPIO[gpio]].count;
     },

@@ -119,7 +119,7 @@ bool esp32hwpcnt_init_unit(int unit, int gpio, int filter, int lim )
 
 
 
-long esp32hwpcnt_get_pulses(int unit){
+int esp32hwpcnt_get_pulses(int unit){
     if (unit > PCNT_UNIT_MAX) return 0;
     int16_t count = 0;
     pcnt_get_counter_value(unit, &count);
@@ -127,7 +127,7 @@ long esp32hwpcnt_get_pulses(int unit){
     return esp32hwpcnt_units[unit]->count;
 }
 
-long esp32hwpcnt_get_majors(int unit){
+int esp32hwpcnt_get_majors(int unit){
     if (unit > PCNT_UNIT_MAX) return 0;
     return esp32hwpcnt_units[unit]->hlims;
 }
@@ -161,7 +161,7 @@ void esp32hwpcnt_main_task(void * pvParameters) {
                 printf(" ZERO");
                 esp32hwpcnt_units[evt.unit]->hlims++;
             }
-            printf(", Cnt=%ld Major=%ld\n", esp32hwpcnt_get_pulses(evt.unit),esp32hwpcnt_get_majors(evt.unit));
+            printf(", Cnt=%i Major=%i\n", esp32hwpcnt_get_pulses(evt.unit),esp32hwpcnt_get_majors(evt.unit));
         } else {
             printf("TSH: [%s] Cycle...\n",__func__);
             // pcnt_get_counter_value(PCNT_TEST_UNIT, &count);
