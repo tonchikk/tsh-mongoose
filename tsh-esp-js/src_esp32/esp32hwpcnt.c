@@ -12,15 +12,15 @@
 
 #include "driver/pcnt.h"
 
-typedef struct {
-    int unit;  // the PCNT unit that originated an interrupt
-    uint32_t status; // information on the event type that caused the interrupt
-} pcnt_evt_t;
 
-esp32hwpcnt_t esp32hwpcnt_units[PCNT_UNIT_MAX]; // ugly eating memory 
+
+esp32hwpcnt_t *esp32hwpcnt_units[PCNT_UNIT_MAX]; // ugly eating memory 
 
 xQueueHandle esp32hwpcnt_evt_queue;   // A queue to handle pulse counter events
 pcnt_isr_handle_t esp32hwpcnt_isr_handle = NULL; //user's ISR service handle
+bool esp32hwpcnt_running = true;
+bool esp32hwpcnt_main_started = false;
+TaskHandle_t esp32hwpcnt_main_task_h = NULL;
 
 int esp32hwpcnt_get_max_units(void) {
     return (int ) PCNT_UNIT_MAX;
@@ -41,7 +41,8 @@ static void IRAM_ATTR esp32hwpcnt_intr_handler(void *arg)
                to pass it to the main program */
             evt.status = PCNT.status_unit[i].val;
             PCNT.int_clr.val = BIT(i);
-            xQueueSendFromISR(esp32hwpcnt_evt_queue, &evt, &HPTaskAwoken);
+            if (esp32hwpcnt_main_started)
+                xQueueSendFromISR(esp32hwpcnt_evt_queue, &evt, &HPTaskAwoken);
             if (HPTaskAwoken == pdTRUE) {
                 portYIELD_FROM_ISR();
             }
@@ -51,12 +52,19 @@ static void IRAM_ATTR esp32hwpcnt_intr_handler(void *arg)
 
 
 
-void esp32hwpcnt_init_unit(int unit, int gpio, int filter, int16_t lim )
+bool esp32hwpcnt_init_unit(int unit, int gpio, int filter, int lim )
 {
+    printf("TSH: [%s] Unit %i @ GPIO %i with h_limit %i, filter %i\n",__func__, unit, gpio, lim, filter);
     if (unit > PCNT_UNIT_MAX) {
-        printf("TSH [esp32hwpcnt_init_unit] unit value of %i exeeds max unit mumber of %i",unit, PCNT_UNIT_MAX);
-        return;
+        printf("TSH: [%s] unit value of %i exeeds max unit mumber of %i\n",__func__, unit, PCNT_UNIT_MAX);
+        return false;
     }
+    if (esp32hwpcnt_units[unit] != NULL) {
+        printf("TSH: [%s] Something wrong: unit %i already initialized, reboot to reset\n",__func__, unit);
+        return false;
+        // free(esp32hwpcnt_units[unit]);
+    }
+
     /* Prepare configuration for the PCNT unit */
     pcnt_config_t pcnt_config = {
         // Set PCNT input signal and control GPIOs
@@ -93,9 +101,11 @@ void esp32hwpcnt_init_unit(int unit, int gpio, int filter, int16_t lim )
     pcnt_counter_pause(unit);
     pcnt_counter_clear(unit);
 
-    esp32hwpcnt_units[unit].count = 0;
-    esp32hwpcnt_units[unit].hlim = lim;
-    esp32hwpcnt_units[unit].hlims = 0;
+    
+    esp32hwpcnt_units[unit] = new(struct esp32hwpcnt);
+    esp32hwpcnt_units[unit]->count = 0;
+    esp32hwpcnt_units[unit]->hlim = lim;
+    esp32hwpcnt_units[unit]->hlims = 0;
 
     /* Register ISR handler and enable interrupts for PCNT unit */
     pcnt_isr_register(esp32hwpcnt_intr_handler, NULL, 0, &esp32hwpcnt_isr_handle);
@@ -103,6 +113,8 @@ void esp32hwpcnt_init_unit(int unit, int gpio, int filter, int16_t lim )
 
     /* Everything is set up, now go to counting */
     pcnt_counter_resume(unit);
+    printf("TSH: [%s] Unit %i initialized\n",__func__, unit);
+    return true;
 }
 
 
@@ -111,19 +123,80 @@ long esp32hwpcnt_get_pulses(int unit){
     if (unit > PCNT_UNIT_MAX) return 0;
     int16_t count = 0;
     pcnt_get_counter_value(unit, &count);
-    esp32hwpcnt_units[unit].count = esp32hwpcnt_units[unit].hlim * esp32hwpcnt_units[unit].hlims + count;
-    return esp32hwpcnt_units[unit].count;
+    esp32hwpcnt_units[unit]->count = esp32hwpcnt_units[unit]->hlim * esp32hwpcnt_units[unit]->hlims + count;
+    return esp32hwpcnt_units[unit]->count;
 }
 
 long esp32hwpcnt_get_majors(int unit){
     if (unit > PCNT_UNIT_MAX) return 0;
-    return esp32hwpcnt_units[unit].hlims;
+    return esp32hwpcnt_units[unit]->hlims;
 }
 
 
-bool mgos_mongoose_os_esp32hwpcnt_init(void) {
+void esp32hwpcnt_main_task(void * pvParameters) {
+    printf("TSH: [%s] Starting\n",__func__);
+    esp32hwpcnt_evt_queue = xQueueCreate(PCNT_UNIT_MAX * 3, sizeof(pcnt_evt_t));
 
-    //printf("TSH [ESP32 PCNT]");
-    printf("TSH [mgos_mongoose_os_esp32hwpcnt_init] executed");
+    portBASE_TYPE res;
+
+    while (esp32hwpcnt_running) {
+        esp32hwpcnt_main_started = true;
+        pcnt_evt_t evt;
+        res = xQueueReceive(esp32hwpcnt_evt_queue, &evt, 1000 / portTICK_PERIOD_MS);
+        if (res == pdTRUE) {
+            printf("Event @PCNT unit[%d]: ev=", evt.unit);
+            if (evt.status & PCNT_STATUS_THRES1_M) {
+                printf(" THRES1");
+            }
+            if (evt.status & PCNT_STATUS_THRES0_M) {
+                printf(" THRES0");
+            }
+            if (evt.status & PCNT_STATUS_L_LIM_M) {
+                printf(" L_LIM");
+            }
+            if (evt.status & PCNT_STATUS_H_LIM_M) {
+                printf(" H_LIM");
+            }
+            if (evt.status & PCNT_STATUS_ZERO_M) {
+                printf(" ZERO");
+                esp32hwpcnt_units[evt.unit]->hlims++;
+            }
+            printf(", Cnt=%ld Major=%ld\n", esp32hwpcnt_get_pulses(evt.unit),esp32hwpcnt_get_majors(evt.unit));
+        } else {
+            printf("TSH: [%s] Cycle...\n",__func__);
+            // pcnt_get_counter_value(PCNT_TEST_UNIT, &count);
+            // printf("Current counter value :%d\n", count);
+        }
+    }
+    printf("TSH: [%s] Stopping\n",__func__);
+    esp32hwpcnt_main_started = false;
+}
+
+
+bool esp32hwpcnt_start(void) {
+
+    if (esp32hwpcnt_main_started) {
+        printf("TSH: [%s] Loop is already in progress, skipping\n",__func__);
+        return true;
+    }
+    if (!esp32hwpcnt_running) {
+        printf("TSH: [%s] esp32hwpcnt_running = false, exiting\n",__func__);
+        return false;
+    }
+
+    BaseType_t xReturned = xTaskCreate(
+        esp32hwpcnt_main_task,          /* Function that implements the task. */
+        esp32hwpcnt_RTOS_TASK_NAME,     /* Text name for the task. */
+        esp32hwpcnt_RTOS_TASK_STACK,    /* Stack size in words, not bytes. */
+        NULL,                           /* Parameter passed into the task. */
+        tskIDLE_PRIORITY,               /* Priority at which the task is created. */
+        &esp32hwpcnt_main_task_h );     /* Used to pass out the created task's handle. */
+    bool rv = (xReturned == pdPASS);
+    printf("TSH: [%s] xTaskCreate returned with %s\n",__func__,rv?"SUCCESS":"FAILURE");
+    return rv;
+}
+
+bool mgos_mongoose_os_esp32hwpcnt_init(void) {
+    printf("TSH: [%s]\n",__func__);   
     return true;
 }
