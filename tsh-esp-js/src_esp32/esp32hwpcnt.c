@@ -144,7 +144,7 @@ int esp32hwpcnt_get_minors(int unit){
 
 double esp32hwpcnt_get_value(int unit) {
     if (unit > PCNT_UNIT_MAX || esp32hwpcnt_units[unit] == NULL) return 0;
-    return esp32hwpcnt_units[unit]->hlims + esp32hwpcnt_get_minors(unit) / esp32hwpcnt_units[unit]->hlim;
+    return esp32hwpcnt_units[unit]->hlims + (double) esp32hwpcnt_get_minors(unit) / esp32hwpcnt_units[unit]->hlim;
 }
 
 void esp32hwpcnt_main_task(void * pvParameters) {
