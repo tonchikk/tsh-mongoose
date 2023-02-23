@@ -22,6 +22,9 @@ bool esp32hwpcnt_running = true;
 bool esp32hwpcnt_main_started = false;
 TaskHandle_t esp32hwpcnt_main_task_h = NULL;
 
+esp32hwpcnt_unit_callback_t esp32hwpcnt_unit_callback = NULL;
+void *esp32hwpcnt_unit_callback_userdata = NULL;
+
 int esp32hwpcnt_get_max_units(void) {
     return (int ) PCNT_UNIT_MAX;
 }
@@ -64,7 +67,8 @@ bool esp32hwpcnt_init_unit(int unit, int gpio, int filter, int lim )
         return false;
         // free(esp32hwpcnt_units[unit]);
     }
-
+    esp32hwpcnt_units[unit] = new(struct esp32hwpcnt);
+    esp32hwpcnt_units[unit]->hlim = lim;
     /* Prepare configuration for the PCNT unit */
     pcnt_config_t pcnt_config = {
         // Set PCNT input signal and control GPIOs
@@ -99,13 +103,7 @@ bool esp32hwpcnt_init_unit(int unit, int gpio, int filter, int lim )
 
     /* Initialize PCNT's counter */
     pcnt_counter_pause(unit);
-    pcnt_counter_clear(unit);
-
-    
-    esp32hwpcnt_units[unit] = new(struct esp32hwpcnt);
-    esp32hwpcnt_units[unit]->count = 0;
-    esp32hwpcnt_units[unit]->hlim = lim;
-    esp32hwpcnt_units[unit]->hlims = 0;
+    esp32hwpcnt_reset_unit(unit);
 
     /* Register ISR handler and enable interrupts for PCNT unit */
     pcnt_isr_register(esp32hwpcnt_intr_handler, NULL, 0, &esp32hwpcnt_isr_handle);
@@ -117,21 +115,37 @@ bool esp32hwpcnt_init_unit(int unit, int gpio, int filter, int lim )
     return true;
 }
 
+bool esp32hwpcnt_reset_unit(int unit){
+    if (unit > PCNT_UNIT_MAX || esp32hwpcnt_units[unit] == NULL) return false;
+    pcnt_counter_clear(unit);
+    esp32hwpcnt_units[unit]->count = 0;
+    esp32hwpcnt_units[unit]->hlims = 0;
+    return true;
+}
 
 
 int esp32hwpcnt_get_pulses(int unit){
-    if (unit > PCNT_UNIT_MAX) return 0;
-    int16_t count = 0;
-    pcnt_get_counter_value(unit, &count);
-    esp32hwpcnt_units[unit]->count = esp32hwpcnt_units[unit]->hlim * esp32hwpcnt_units[unit]->hlims + count;
+    if (unit > PCNT_UNIT_MAX || esp32hwpcnt_units[unit] == NULL) return 0;
+    esp32hwpcnt_units[unit]->count = esp32hwpcnt_units[unit]->hlim * esp32hwpcnt_units[unit]->hlims + esp32hwpcnt_get_minors(unit);
     return esp32hwpcnt_units[unit]->count;
 }
 
 int esp32hwpcnt_get_majors(int unit){
-    if (unit > PCNT_UNIT_MAX) return 0;
+    if (unit > PCNT_UNIT_MAX || esp32hwpcnt_units[unit] == NULL) return 0;
     return esp32hwpcnt_units[unit]->hlims;
 }
 
+int esp32hwpcnt_get_minors(int unit){
+    if (unit > PCNT_UNIT_MAX || esp32hwpcnt_units[unit] == NULL) return 0;
+    int16_t count = 0;
+    pcnt_get_counter_value(unit, &count);
+    return count;
+}
+
+double esp32hwpcnt_get_value(int unit) {
+    if (unit > PCNT_UNIT_MAX || esp32hwpcnt_units[unit] == NULL) return 0;
+    return esp32hwpcnt_units[unit]->hlims + esp32hwpcnt_get_minors(unit) / esp32hwpcnt_units[unit]->hlim;
+}
 
 void esp32hwpcnt_main_task(void * pvParameters) {
     printf("TSH: [%s] Starting\n",__func__);
@@ -162,6 +176,8 @@ void esp32hwpcnt_main_task(void * pvParameters) {
                 esp32hwpcnt_units[evt.unit]->hlims++;
             }
             printf(", Cnt=%i Major=%i\n", esp32hwpcnt_get_pulses(evt.unit),esp32hwpcnt_get_majors(evt.unit));
+            if (esp32hwpcnt_unit_callback != NULL)
+                esp32hwpcnt_unit_callback(evt.unit,esp32hwpcnt_unit_callback_userdata);
         } else {
             printf("TSH: [%s] Cycle...\n",__func__);
             // pcnt_get_counter_value(PCNT_TEST_UNIT, &count);
@@ -195,6 +211,13 @@ bool esp32hwpcnt_start(void) {
     printf("TSH: [%s] xTaskCreate returned with %s\n",__func__,rv?"SUCCESS":"FAILURE");
     return rv;
 }
+
+bool esp32hwpcnt_set_global_cb(esp32hwpcnt_unit_callback_t callback, void *user_data) {
+    esp32hwpcnt_unit_callback = callback;
+    esp32hwpcnt_unit_callback_userdata = user_data;
+    return true;
+}
+
 
 bool mgos_mongoose_os_esp32hwpcnt_init(void) {
     printf("TSH: [%s]\n",__func__);   

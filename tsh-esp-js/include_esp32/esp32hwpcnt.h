@@ -21,12 +21,24 @@ typedef struct pcnt_evt {
 #define esp32hwpcnt_RTOS_TASK_STACK 8192
 
 
+// Meta
 int esp32hwpcnt_get_max_units(void);
+
+// Per Unit
 bool esp32hwpcnt_init_unit(int unit, int gpio, int filter, int lim );
+bool esp32hwpcnt_reset_unit(int unit);
+//   At runtime
 int esp32hwpcnt_get_pulses(int unit);
 int esp32hwpcnt_get_majors(int unit);
+int esp32hwpcnt_get_minors(int unit);
+double esp32hwpcnt_get_value(int unit);
+
+// Globals
 bool esp32hwpcnt_start(void);
 void esp32hwpcnt_main_task(void * pvParameters);
+
+typedef void (*esp32hwpcnt_unit_callback_t)(int unit,void *userdata);
+bool esp32hwpcnt_set_global_cb(esp32hwpcnt_unit_callback_t callback, void *user_data);
 
 
 #ifdef __cplusplus
