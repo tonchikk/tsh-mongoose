@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include "mgos.h"
 #include "esp32hwpcnt.h"
+#include "mgos_system.h"
 #include <string.h>
 
 #include "tsh_common.h"
@@ -147,6 +148,12 @@ double esp32hwpcnt_get_value(int unit) {
     return esp32hwpcnt_units[unit]->hlims + (double) esp32hwpcnt_get_minors(unit) / esp32hwpcnt_units[unit]->hlim;
 }
 
+static void mgos_esp32hwpcnt_unit_callback(void *arg) {
+    int unit = (intptr_t) arg;
+    if (esp32hwpcnt_unit_callback != NULL)
+        esp32hwpcnt_unit_callback(unit,esp32hwpcnt_unit_callback_userdata);
+}
+
 void esp32hwpcnt_main_task(void * pvParameters) {
     printf("TSH: [%s] Starting\n",__func__);
     esp32hwpcnt_evt_queue = xQueueCreate(PCNT_UNIT_MAX * 3, sizeof(pcnt_evt_t));
@@ -177,7 +184,8 @@ void esp32hwpcnt_main_task(void * pvParameters) {
             }
             printf(", Cnt=%i Major=%i\n", esp32hwpcnt_get_pulses(evt.unit),esp32hwpcnt_get_majors(evt.unit));
             if (esp32hwpcnt_unit_callback != NULL)
-                esp32hwpcnt_unit_callback(evt.unit,esp32hwpcnt_unit_callback_userdata);
+                mgos_invoke_cb(mgos_esp32hwpcnt_unit_callback, (void *) (intptr_t) evt.unit, false);
+            //    esp32hwpcnt_unit_callback(evt.unit,esp32hwpcnt_unit_callback_userdata);
         } else {
             printf("TSH: [%s] Cycle...\n",__func__);
             // pcnt_get_counter_value(PCNT_TEST_UNIT, &count);

@@ -47,29 +47,38 @@ let esp32hwpcnt = {
         },
         load: function() {
             print("TSH JS: [esp32hwpcnt.persistence.load] Started");
+            esp32hwpcnt.persistence.GPIOs = JSON.parse(File.read(esp32hwpcnt.persistence.filename));
+            for (let g in esp32hwpcnt.persistence.GPIOs) {
+                print("TSH JS: [esp32hwpcnt.persistence.load] GPIO",g);
+            };
         },
         save: function() {
             for (let g in esp32hwpcnt.persistence.GPIOs) {
                 esp32hwpcnt.persistence.persist(g)
             };
+            File.write(JSON.stringify(esp32hwpcnt.persistence.GPIOs),esp32hwpcnt.persistence.filename,'w');
             print("TSH JS: [esp32hwpcnt.persistence.save]",JSON.stringify(esp32hwpcnt.persistence.GPIOs));
         },
-        interval: 1, //sec,
+        interval: 60, //sec,
         tm: null,
         init: function(){
             print("TSH JS: [esp32hwpcnt.persistence.init] Started");
             esp32hwpcnt.persistence.load();
 
-            for (let g in esp32hwpcnt.persistence.GPIOs) {
-                esp32hwpcnt.init(g, esp32hwpcnt.persistence.GPIOs[g].lim, true);
-            };
-
+            print("TSH JS: [esp32hwpcnt.persistence.init] Sheduling saving to file every",esp32hwpcnt.persistence.interval,"seconds");
             if (esp32hwpcnt.persistence.tm === null ) {
                 esp32hwpcnt.persistence.tm = Timer.set(esp32hwpcnt.persistence.interval * 1000, true, function() {
                     esp32hwpcnt.persistence.save();
               }, null);
-            }
+            };
             print("TSH JS: [esp32hwpcnt.persistence.init] Done");
+        },
+        startAll: function(){
+            print("TSH JS: [esp32hwpcnt.persistence.startAll]");
+            for (let g in esp32hwpcnt.persistence.GPIOs) {
+                print("TSH JS: [esp32hwpcnt.persistence.startAll] Initialising saved counter @ GPIO",g);
+                esp32hwpcnt.init(JSON.parse(g), esp32hwpcnt.persistence.GPIOs[g].lim, true);
+            };
         }
     },
     init: function(gpio, lim, persist){
@@ -161,10 +170,15 @@ let esp32hwpcnt = {
 
 let esp32hwpcnt_ev_zero_cb = function(unit) {
     print("TSH JS: [esp32hwpcnt_ev_zero_cb] for unit ", unit, " value = ", esp32hwpcnt.get_unit_value(unit));
+    let data=esp32hwpcnt.getAll(esp32hwpcnt.Units[unit].gpio);
+    data.gpio = esp32hwpcnt.Units[unit].gpio;
+    data.persisted = (esp32hwpcnt.persistence.GPIOs[esp32hwpcnt.Units[unit].gpio] !== undefined);
+    MQTT_publish("/esp32hwpcnt",data);
 };
 
 
 print("TSH JS: Starting ESP32 HW PCNT ",esp32hwpcnt.start()?"OK":"FAIL", " with max units of ",esp32hwpcnt.get_max_units());
 esp32hwpcnt.set_global_callback(esp32hwpcnt_ev_zero_cb,null);
 esp32hwpcnt.persistence.init();
+esp32hwpcnt.persistence.startAll();
 esp32hwpcnt.init(22, 1024, true);
