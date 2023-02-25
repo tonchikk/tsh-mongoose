@@ -8,7 +8,11 @@ typedef struct esp32hwpcnt {
     // int unit;
     int count, hlims;
     int16_t hlim;
+    double value;
     int gpio;
+    int64_t tc, tv;
+    int ppm;
+    double vph;
     //struct esp32hwpcnt *next;
 } esp32hwpcnt_t;
 
@@ -32,6 +36,8 @@ int esp32hwpcnt_get_pulses(int unit);
 int esp32hwpcnt_get_majors(int unit);
 int esp32hwpcnt_get_minors(int unit);
 double esp32hwpcnt_get_value(int unit);
+int esp32hwpcnt_get_ppm(int unit);
+double esp32hwpcnt_get_vph(int unit);
 
 // Globals
 bool esp32hwpcnt_start(void);
