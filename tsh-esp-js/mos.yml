@@ -1,6 +1,6 @@
 author: Tonchik
 description: ESP JS for TSH
-version: 2023.1.0-dev-pcnt
+version: 2023.1.0
 
 #libs_version: 2.19.1 #${mos.version}
 #modules_version: 2.19.1 #${mos.version}
@@ -58,5 +58,6 @@ tags:
   - mqtt
   - pwm
   - MH-Z19
+  - PulseCounter
 
 manifest_version: 2020-08-02
