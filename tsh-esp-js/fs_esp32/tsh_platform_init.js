@@ -64,12 +64,15 @@ function MHZ19_init(uartNo, rxto, txto, interval) {
 // Serial3.write("\xFF\x01\x87\x00\x00\x00\x00\x00\x78"); ZERO POINT CALIBRATION
 // Serial3.write("\xFF\x01\x79\x00\x00\x00\x00\x00\x86"); ABC logic off
 // Serial3.write("\xFF\x01\x79\xA0\x00\x00\x00\x00\xE6"); ABC logic on
-
+/*
 MQTT.sub(MQTT_dev + '/MHZ19/init', function(conn, topic, msg) {
   print('Topic:', topic, 'message:', msg);
   let o = JSON.parse(msg);
   MHZ19_init(o.uartNo,o.rxto,o.txto,o.interval);
 }, null);
+*/
+
+TSH.subscribe('/MHZ19/init', function(o) {MHZ19_init(o.uartNo,o.rxto,o.txto,o.interval);} );
 
 // Zero point calibration routines 
 
@@ -79,16 +82,13 @@ function MHZ19_zpc(o){
     UART.write(o.uartNo, "\xFF\x01\x87\x00\x00\x00\x00\x00\x78");
 };
 
-MQTT.sub(MQTT_dev + '/MHZ19/zpc', function(conn, topic, msg) {
-    print('Topic:', topic, 'message:', msg);
-    MHZ19_zpc(JSON.parse(msg));
-}, null);
+TSH.subscribe('/MHZ19/zpc', MHZ19_zpc);
 
 // ABC enabled = "lowest seen in a day will be 400 PPM"
 // mosquitto_pub -p 2883 --u user -P password -t /devices/???/MHZ19/abc -m '{"uartNo":1,"abc":true}'
 function MHZ19_abc(o){
-    
     // Off by default on start
+    print("TSH JS [MHZ19_abc]",o.abc,"for UART",o.uartNo,"");
     if (o.abc) {
         UART.write(o.uartNo,"\xFF\x01\x79\xA0\x00\x00\x00\x00\xE6"); // ABC logic on
     }else{
@@ -96,7 +96,4 @@ function MHZ19_abc(o){
     }
 }
 
-MQTT.sub(MQTT_dev + '/MHZ19/abc', function(conn, topic, msg) {
-    print('Topic:', topic, 'message:', msg);
-    MHZ19_abc(JSON.parse(msg));
-}, null);
+TSH.subscribe('/MHZ19/abc', MHZ19_abc);

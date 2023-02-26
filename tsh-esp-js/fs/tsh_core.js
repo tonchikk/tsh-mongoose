@@ -1,3 +1,7 @@
+// MQTT_dev will be used as MQTT topics prefixes below
+let MQTT_dev = '/devices/' + Cfg.get('device.id');
+
+
 let TSH = {
     Debug: 0,
     // lastConfig and lastWiFi_GOT_IP usefull for configuration engine
@@ -7,12 +11,17 @@ let TSH = {
     lastWiFi_GOT_IP: -1,
     // FYI
     device: "unknown",
-    tsh_version: "none"
+    tsh_version: "none",
+    topic_handler: function(conn, topic, msg, ud) {
+      print('TSH JS [topic_handler]:', topic, '=', msg);
+      ud(JSON.parse(msg));
+    },
+    subscribe: function(path,handler){
+      MQTT.sub(MQTT_dev + path, TSH.topic_handler, handler);
+    }
 };
 
 
-// MQTT_dev will be used as MQTT topics prefixes below
-let MQTT_dev = '/devices/' + Cfg.get('device.id');
 /**
  * Common publisher for MQTT
  * @param {*} component - second part of MQTT path to publish
