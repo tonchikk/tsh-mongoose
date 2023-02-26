@@ -17,9 +17,9 @@ let esp32hwpcnt_ev_zero_cb = function(unit) {
 
 
 let esp32hwpcnt_publish_all = function(u) {
-    print("TSH JS: [esp32hwpcnt_publish_all] @",u);
+    //print("TSH JS: [esp32hwpcnt_publish_all] @",u);
     for (let g in esp32hwpcnt.GPIO) {
-        print("TSH JS: [esp32hwpcnt_publish_all] GPIO",g,"lp",esp32hwpcnt_published[g].lp,'interval',esp32hwpcnt_published[g].interval);
+        //print("TSH JS: [esp32hwpcnt_publish_all] GPIO",g,"lp",esp32hwpcnt_published[g].lp,'interval',esp32hwpcnt_published[g].interval);
         if(esp32hwpcnt_published[g] !== undefined &&
            esp32hwpcnt_published[g].interval > 0 && 
            u - esp32hwpcnt_published[g].lp > esp32hwpcnt_published[g].interval)
