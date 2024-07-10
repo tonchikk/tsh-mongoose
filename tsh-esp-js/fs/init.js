@@ -2,7 +2,7 @@
 
    This is TSH Worker tested on ESP32 based devboards
 
-   Copyright 2017-2022 Anton Kaukin
+   Copyright 2017-2024 Anton Kaukin
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -156,6 +156,17 @@ let GPIO_setOutput = function (pin, state) {
   GPIO.set_mode(pin, GPIO.MODE_OUTPUT);
   GPIO.write(pin, state);
 };
+
+let GPIO_pulse = function (pin, state, time) {
+  print("Pulse for ", pin, "set to", state);
+  GPIO_setOutput(pin, state);
+  Timer.set(time, 0, function(id) {
+    let value = GPIO.toggle(id);
+    print("Pulse for ", id, " back to ", value);
+  }, pin);
+};
+
+TSH.subscribe('/GPIO/pulse', function(o) {GPIO_pulse(o.pin,o.state,o.time);} );
 
 // Basic subscriptions
 MQTT.sub(MQTT_dev + '/GPIO/setPWM', function(conn, topic, msg) {
